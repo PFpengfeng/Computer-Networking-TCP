@@ -31,7 +31,7 @@ class StreamReassembler {
     std::set<Package> _data_buffer{};
 
   //   // a flag line ----------
-
+ 
     ByteStream _output;  //!< The reassembled in-order byte stream
     size_t _capacity;    //!< The maximum number of bytes
 
