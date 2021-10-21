@@ -3,11 +3,17 @@
         {
             "name": "Linux",
             "includePath": [
-                "${default}"
+                "${default}",
+                "${workspaceFolder}/libsponge/tcp_helpers",
+                "${workspaceFolder}/libsponge/util",
+                "${workspaceFolder}/tests",
+                "${workspaceFolder}/apps",
+                "${workspaceFolder}/doctests",
+                "${workspaceFolder}/libsponge"
             ],
             "compilerPath": "/usr/bin/clang",
             "cStandard": "c17",
-            "cppStandard": "c++14",
+            "cppStandard": "c++17",
             "intelliSenseMode": "linux-clang-x64"
         }
     ],

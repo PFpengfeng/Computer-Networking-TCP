@@ -15,7 +15,10 @@
 //! remote TCPSender.
 class TCPReceiver {
     //! Our data structure for re-assembling bytes.
-    
+    bool _syn_recvd{false};
+    bool _fin_recvd{false};
+    WrappingInt32 _isn{0};
+    uint64_t _index{0};
     StreamReassembler _reassembler;
 
     //! The maximum number of bytes we'll store.
