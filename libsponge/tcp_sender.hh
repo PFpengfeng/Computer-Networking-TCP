@@ -25,6 +25,7 @@ class TCPSender {
 
     //! retransmission timer for the connection
     unsigned int _initial_retransmission_timeout;
+  
 
     //! outgoing stream of bytes that have not yet been sent
     ByteStream _stream;
@@ -32,6 +33,10 @@ class TCPSender {
     //! the (absolute) sequence number for the next byte to be sent
     uint64_t _next_seqno{0};
     uint64_t _inflight_begin_seqno{0};
+    WrappingInt32 _last_rtx_seq;
+    unsigned int _consecutive_rtx_number{0};
+    unsigned int _rtx_timeout_save{0};
+    bool _no_window_flag{false};
 
    //! the inflight segments which have sented
    std::queue<TCPSegment> _inflight_segments{};

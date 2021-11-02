@@ -1,5 +1,4 @@
 #include "tcp_state.hh"
-
 using namespace std;
 
 string TCPState::state_summary(const TCPReceiver &receiver) {
