@@ -67,5 +67,44 @@ TCP sender 实现
 
 **fill window**
 
-1. 只要有空间就要发送数据
-2. 
+
+
+
+
+```mermaid
+graph TD;
+    fill_window-->B;
+    fill_window-->C;
+    B-->D;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```
