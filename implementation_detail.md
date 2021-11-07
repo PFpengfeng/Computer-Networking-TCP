@@ -63,7 +63,7 @@ TCP receiver 实现
 
 TCP sender 实现
 
-逻辑整理：
+逻辑整理( TD graph can be viewed on Typora)：
 
 **fill window**
 
@@ -71,13 +71,19 @@ TCP sender 实现
 
 
 
-```mermaid
-graph TD;
-    fill_window-->B;
-    fill_window-->C;
-    B-->D;
-
-
+```flow
+st=>start: fill_window
+c1=>condition:SYN sent?
+c2=>condition:SYN acked?
+op=>operation: 处理框
+cond=>condition: 判断框(是或否?)
+sub1=>subroutine: 子流程
+io=>inputoutput: 输入输出框
+e=>end: 结束框
+st->op->cond
+cond(yes)->io->e
+cond(no)->sub1(right)->op
+```
 
 
 
