@@ -22,6 +22,11 @@ class TCPConnection {
     bool _linger_after_streams_finish{true};
 
     size_t _timer{0};
+    bool _rst_received{false};
+    bool is_preq1() const;
+    bool is_preq2() const;
+    bool is_preq3() const;
+    // bool is_preq4() const;
 
   public:
     //! \name "Input" interface for the writer

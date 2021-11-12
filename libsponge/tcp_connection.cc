@@ -29,12 +29,46 @@ size_t TCPConnection::time_since_last_segment_received() const {
  }
 
 void TCPConnection::segment_received(const TCPSegment &seg) { 
+    if (seg.header().rst){
+        _sender.stream_in().set_error();
+        _receiver.stream_out().set_error();
+        _rst_received = true;
+        return ;
+    }
     _receiver.segment_received(seg);
+    if(seg.header().ack){
+        _sender.ack_received(seg.header().ackno,seg.header().win);
+    }
+    if (_sender.segments_out().empty()){
+        _sender.send_empty_segment();
+    }
+    if ((_receiver.ackno().has_value() && (seg.length_in_sequence_space() == 0) && \
+                  seg.header().seqno == _receiver.ackno().value() - 1)) {
+        _sender.send_empty_segment();
+    }
+    queue<TCPSegment> send_queue = _sender.segments_out();
+    TCPSegment temp_segment = send_queue.front();
+    send_queue.pop();
+    int window_size = _receiver.stream_out().remaining_capacity();
+    temp_segment.header().win = min(window_size,UINT_LEAST16_MAX);
+    _segments_out.push(temp_segment);
+    while(!send_queue.empty()){
+        _segments_out.push(send_queue.front());
+        _segments_out.pop();
+    }
     _timer = 0;
  }
 
 bool TCPConnection::active() const {
-    return ((!_sender.stream_in().eof()) || _linger_after_streams_finish);
+    if (_rst_received){
+        return false;
+    }
+    if(is_preq1() && is_preq3()){
+        return false;
+    }
+    else{
+        return true;
+    }
  }
 
 size_t TCPConnection::write(const string &data) {
@@ -45,9 +79,6 @@ size_t TCPConnection::write(const string &data) {
 //! \param[in] ms_since_last_tick number of milliseconds since the last call to this method
 void TCPConnection::tick(const size_t ms_since_last_tick) { 
     _timer += ms_since_last_tick;
-    if (_timer >= 10 * _cfg.rt_timeout){
-        _linger_after_streams_finish = true;
-    }
 }
 
 void TCPConnection::end_input_stream() {
@@ -69,3 +100,21 @@ TCPConnection::~TCPConnection() {
         std::cerr << "Exception destructing TCP FSM: " << e.what() << std::endl;
     }
 }
+
+
+bool TCPConnection::is_preq1() const{
+    return (_receiver.unassembled_bytes() == 0 && _receiver.stream_out().eof());
+}
+
+
+bool TCPConnection::is_preq2() const{
+    return _sender.fin_sent();
+}
+
+bool TCPConnection::is_preq3() const{
+    return (_sender.bytes_in_flight() == 0 && _sender.fin_sent());
+}
+
+// bool TCPConnection::is_preq4(){
+//     return _sender.fin_sent();
+// }
