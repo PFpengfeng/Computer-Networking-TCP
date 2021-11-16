@@ -25,27 +25,33 @@ class TCPSender {
 
     //! retransmission timer for the connection
     unsigned int _initial_retransmission_timeout;
-  
 
     //! outgoing stream of bytes that have not yet been sent
     ByteStream _stream;
 
     //! the (absolute) sequence number for the next byte to be sent
     uint64_t _next_seqno{0};
-    uint64_t _inflight_begin_seqno{0};
-    WrappingInt32 _last_rtx_seq;
-    unsigned int _consecutive_rtx_number{0};
-    unsigned int _rtx_timeout_save{0};
-    bool _no_window_flag{false};
 
-   //! the inflight segments which have sented
-   std::queue<TCPSegment> _inflight_segments{};
-   unsigned int _absolute_index = 0;
-   size_t _now_timer = 0;
-   bool _syn_sent{false};
-   bool _fin_sent{false};
-   size_t _window_size = 0;
-   uint64_t _inflight_bytes = 0;
+    //已经确认的ack序号
+    size_t _recv_ackno{};
+
+    //开始和结束flag
+    bool _syn{};
+    bool _fin{};
+
+    //窗口大小
+    size_t _win_size{};
+    //已发送但尚未确认的段占用的序号数
+    size_t _byte_in_flight{};
+
+    //已发送但尚未确认的段
+    std::queue<TCPSegment> _segments_outstanding{};
+
+    //timer
+    unsigned int _retransmission_timeout;
+    bool _time_run{false};
+    size_t _timer = 0;
+    unsigned int _consecutive_retransmissions{0};
 
 
   public:
