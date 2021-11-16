@@ -84,7 +84,7 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
     size_t abs_ackno = unwrap(ackno,_isn,_recv_ackno);
     _win_size = window_size;
     //说明改ackno之前的段已经都确认过了，直接返回
-    if(abs_ackno <= _recv_ackno) return;
+    if(abs_ackno <= _recv_ackno || abs_ackno > _next_seqno) return;
     //否则更新_recv_ackno 的值为当前ackno
     _recv_ackno = abs_ackno;
     TCPSegment seg;
