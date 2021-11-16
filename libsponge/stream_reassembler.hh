@@ -12,30 +12,24 @@
 
 
 class StreamReassembler {
-  private:
+   private:
     // Your code here -- add private members as necessary.
-    struct  Package
-    {
-       size_t index = 0;
-       size_t length = 0;
-       std::string data = "";
-       bool operator<(const Package right) const{
-         return index < right.index;
-       }
+    struct block_node {
+        size_t begin = 0;
+        size_t length = 0;
+        std::string data = "";
+        bool operator<(const block_node t) const { return begin < t.begin; }
     };
-
-    // Your code here -- add private members as necessary.
-    bool _eof{false};
-    size_t _unassembled_bytes_num = 0;
-    size_t _low_index = 0;
-    std::set<Package> _data_buffer{};
-
-  //   // a flag line ----------
- 
+    std::set<block_node> _blocks = {};
+    std::vector<char> _buffer = {};
+    size_t _unassembled_byte = 0;
+    size_t _head_index = 0;
+    bool _eof_flag = false;
     ByteStream _output;  //!< The reassembled in-order byte stream
     size_t _capacity;    //!< The maximum number of bytes
 
-  int merge_package(Package &lift,const Package &right);
+    //! merge elm2 to elm1, return merged bytes
+    long merge_block(block_node &elm1, const block_node &elm2);
 
   public:
     //! \brief Construct a `StreamReassembler` that will store up to `capacity` bytes.

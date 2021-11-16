@@ -13,96 +13,102 @@ void DUMMY_CODE(Targs &&... /* unused */) {}
 using namespace std;
 
 
-StreamReassembler::StreamReassembler(const size_t capacity) : _output(capacity), _capacity(capacity) {}
+StreamReassembler::StreamReassembler(const size_t capacity) : _output(capacity), _capacity(capacity) {
+    _buffer.resize(capacity);
+}
 
-// merge two Package and return the merge length.
-int StreamReassembler::merge_package(Package &lift,const Package &right){
-    Package x,y;
-    if (lift.index <= right.index){
-        x = lift;
-        y = right;
+long StreamReassembler::merge_block(block_node &elm1, const block_node &elm2) {
+    block_node x, y;
+    if (elm1.begin > elm2.begin) {
+        x = elm2;
+        y = elm1;
+    } else {
+        x = elm1;
+        y = elm2;
     }
-    else{
-        x = right;
-        y = lift;
-    }
-    // without intersection, return -1
-    if (x.index + x.length < y.index){
-        return -1;
-    }
-    // y is in x
-    if (x.index + x.length > y.index + y.length){
-        lift = x;
+    if (x.begin + x.length < y.begin) {
+        return -1;  // no intersection, couldn't merge
+    } else if (x.begin + x.length >= y.begin + y.length) {
+        elm1 = x;
         return y.length;
+    } else {
+        elm1.begin = x.begin;
+        elm1.data = x.data + y.data.substr(x.begin + x.length - y.begin);
+        elm1.length = elm1.data.length();
+        return x.begin + x.length - y.begin;
     }
-    size_t loc = x.index + x.length - y.index;
-    x.data = x.data + y.data.substr(loc);
-    x.length = x.data.size();
-    lift = x;
-    return loc;
 }
 
 //! \details This function accepts a substring (aka a segment) of bytes,
 //! possibly out-of-order, from the logical stream, and assembles any newly
 //! contiguous substrings and writes them into the output stream in order.
 void StreamReassembler::push_substring(const string &data, const size_t index, const bool eof) {
-    if (index + data.size() <= _low_index){
-        if (eof){
-            _eof = true;
-            if(_unassembled_bytes_num == 0){
-                _output.end_input();
+    if (index >= _head_index + _capacity) {  // capacity over
+        return;
+    }
+
+    // handle extra substring prefix
+    block_node elm;
+    if (index + data.length() <= _head_index) {  // couldn't equal, because there have emtpy substring
+        goto JUDGE_EOF;
+    } else if (index < _head_index) {
+        size_t offset = _head_index - index;
+        elm.data.assign(data.begin() + offset, data.end());
+        elm.begin = index + offset;
+        elm.length = elm.data.length();
+    } else {
+        elm.begin = index;
+        elm.length = data.length();
+        elm.data = data;
+    }
+    _unassembled_byte += elm.length;
+
+    // merge substring
+    do {
+        // merge next
+        long merged_bytes = 0;
+        auto iter = _blocks.lower_bound(elm);
+        while (iter != _blocks.end() && (merged_bytes = merge_block(elm, *iter)) >= 0) {
+            _unassembled_byte -= merged_bytes;
+            _blocks.erase(iter);
+            iter = _blocks.lower_bound(elm);
+        }
+        // merge prev
+        if (iter == _blocks.begin()) {
+            break;
+        }
+        iter--;
+        while ((merged_bytes = merge_block(elm, *iter)) >= 0) {
+            _unassembled_byte -= merged_bytes;
+            _blocks.erase(iter);
+            iter = _blocks.lower_bound(elm);
+            if (iter == _blocks.begin()) {
+                break;
             }
+            iter--;
         }
-        return ;
-    }
-    Package node;
-    if (index < _low_index){
-        node.data = data.substr(_low_index - index);
-        node.index = _low_index;
-        node.length = data.size() - (_low_index - index);
-    }
-    else{
-        node.data = data;
-        node.index = index;
-        node.length = data.size();
-    }
-    _unassembled_bytes_num += node.length;
-    // if (index > _low_index){
-    //     _unassembled_bytes_num += node.length;
-    // }
-    
-    int merge_len = -1;
-    set<Package>::iterator itr = _data_buffer.begin();
-    while(itr != _data_buffer.end()){
-        merge_len = merge_package(node,*itr);
-        if(merge_len < 0){ break;}
-        _unassembled_bytes_num -= merge_len;
-        _data_buffer.erase(itr);
-        itr = _data_buffer.begin();
-    }
-    _data_buffer.insert(node);
+    } while (false);
+    _blocks.insert(elm);
 
-    // write byte into stream;
-    itr = _data_buffer.begin();
-    size_t write_len = 0;
-    if (itr->index == _low_index){
-        write_len += _output.write(itr->data);
-        _low_index += write_len;
-        _unassembled_bytes_num -= write_len;
-        _data_buffer.erase(itr);
+    // write to ByteStream
+    if (!_blocks.empty() && _blocks.begin()->begin == _head_index) {
+        const block_node head_block = *_blocks.begin();
+        // modify _head_index and _unassembled_byte according to successful write to _output
+        size_t write_bytes = _output.write(head_block.data);
+        _head_index += write_bytes;
+        _unassembled_byte -= write_bytes;
+        _blocks.erase(_blocks.begin());
     }
 
-    if (eof){
-            _eof = true;
-        }
-    if (_eof && _unassembled_bytes_num ==0){
+JUDGE_EOF:
+    if (eof) {
+        _eof_flag = true;
+    }
+    if (_eof_flag && empty()) {
         _output.end_input();
     }
-    return ;
 }
 
-size_t StreamReassembler::unassembled_bytes() const { 
-	return _unassembled_bytes_num;
-}
+size_t StreamReassembler::unassembled_bytes() const { return _unassembled_byte; }
 
-bool StreamReassembler::empty() const { return _unassembled_bytes_num==0; }
+bool StreamReassembler::empty() const { return _unassembled_byte == 0; }
