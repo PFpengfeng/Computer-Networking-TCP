@@ -67,23 +67,23 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
         node.length = data.size();
     }
     _unassembled_bytes_num += node.length;
-    // if (index > _low_index){
-    //     _unassembled_bytes_num += node.length;
-    // }
     
     int merge_len = -1;
-    set<Package>::iterator itr = _data_buffer.begin();
-    while(itr != _data_buffer.end()){
+    // set<Package>::iterator itr = _data_buffer.begin();
+    for (auto itr = _data_buffer.begin(); itr != _data_buffer.end(); itr++){
         merge_len = merge_package(node,*itr);
-        if(merge_len < 0){ break;}
-        _unassembled_bytes_num -= merge_len;
-        _data_buffer.erase(itr);
-        itr = _data_buffer.begin();
+        if(merge_len < 0){ 
+            continue;
+        }
+        else{
+            _unassembled_bytes_num -= merge_len;
+            _data_buffer.erase(itr);
+        }
     }
     _data_buffer.insert(node);
 
     // write byte into stream;
-    itr = _data_buffer.begin();
+    set<Package>::iterator itr = _data_buffer.begin();
     size_t write_len = 0;
     if (itr->index == _low_index){
         write_len += _output.write(itr->data);
