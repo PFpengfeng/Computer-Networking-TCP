@@ -37,6 +37,7 @@ int StreamReassembler::merge_package(Package &lift,const Package &right){
     }
     size_t loc = x.index + x.length - y.index;
     x.data = x.data + y.data.substr(loc);
+    cout<<"loc = "<<loc<<endl;
     x.length = x.data.size();
     lift = x;
     return loc;
@@ -46,7 +47,7 @@ int StreamReassembler::merge_package(Package &lift,const Package &right){
 //! possibly out-of-order, from the logical stream, and assembles any newly
 //! contiguous substrings and writes them into the output stream in order.
 void StreamReassembler::push_substring(const string &data, const size_t index, const bool eof) {
-    if (index + data.size() <= _low_index){
+    if (index + data.size() <= _low_index || data.size() == 0){
         if (eof){
             _eof = true;
             if(_unassembled_bytes_num == 0){
@@ -69,21 +70,34 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
     _unassembled_bytes_num += node.length;
     
     int merge_len = -1;
-    // set<Package>::iterator itr = _data_buffer.begin();
-    for (auto itr = _data_buffer.begin(); itr != _data_buffer.end(); itr++){
-        merge_len = merge_package(node,*itr);
-        if(merge_len < 0){ 
-            continue;
-        }
-        else{
+    set<Package>::iterator itr = _data_buffer.lower_bound(node);
+    if(itr != _data_buffer.end()){
+        while ((merge_len = merge_package(node,*itr)) >= 0)
+        {
             _unassembled_bytes_num -= merge_len;
             _data_buffer.erase(itr);
+            itr = _data_buffer.lower_bound(node);
+            if(itr == _data_buffer.end()){
+                break;
+            }
+        }
+        
+    }
+    while(itr != _data_buffer.begin()){
+        --itr;
+        if((merge_len = merge_package(node,*itr)) >=0){
+            _unassembled_bytes_num -= merge_len;
+            _data_buffer.erase(itr);
+            itr = _data_buffer.lower_bound(node);
+        }
+        else{
+            break;
         }
     }
     _data_buffer.insert(node);
 
     // write byte into stream;
-    set<Package>::iterator itr = _data_buffer.begin();
+    itr = _data_buffer.begin();
     size_t write_len = 0;
     if (itr->index == _low_index){
         write_len += _output.write(itr->data);
