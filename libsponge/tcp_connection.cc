@@ -18,7 +18,7 @@ size_t TCPConnection::remaining_outbound_capacity() const {
 
 size_t TCPConnection::bytes_in_flight() const { 
     return _sender.bytes_in_flight();
- }
+}
 
 size_t TCPConnection::unassembled_bytes() const { 
     return _receiver.unassembled_bytes();
@@ -39,41 +39,23 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
             _receiver.segment_received(seg);
             _sender.fill_window(); 
             connect();
+            return ;
         }
-        return ;
+        else if(seg.length_in_sequence_space() == 0 && seg.header().seqno == _receiver.ackno().value() - 1){
+            _sender.send_empty_segment();
+        }
+        else{
+            return ;
+        }
+    }
+    else if(seg.header().rst){
+        _sender.send_empty_segment();
+        unclean_shutdown();
     }
     else{
         
-        
     }
-    if (seg.header().rst){
-        _sender.stream_in().set_error();
-        _receiver.stream_out().set_error();
-        _rst_received = true;
-        return ;
-    }
-    _receiver.segment_received(seg);
-    if(seg.header().ack){
-        _sender.ack_received(seg.header().ackno,seg.header().win);
-    }
-    if (_sender.segments_out().empty()){
-        _sender.send_empty_segment();
-    }
-    if ((_receiver.ackno().has_value() && (seg.length_in_sequence_space() == 0) && \
-                  seg.header().seqno == _receiver.ackno().value() - 1)) {
-        _sender.send_empty_segment();
-    }
-    queue<TCPSegment> send_queue = _sender.segments_out();
-    TCPSegment temp_segment = send_queue.front();
-    send_queue.pop();
-    int window_size = _receiver.stream_out().remaining_capacity();
-    temp_segment.header().win = min(window_size,UINT_LEAST16_MAX);
-    _segments_out.push(temp_segment);
-    while(!send_queue.empty()){
-        _segments_out.push(send_queue.front());
-        _segments_out.pop();
-    }
-    _timer = 0;
+    clean_shutdown();
  }
 
 bool TCPConnection::active() const {
@@ -141,4 +123,5 @@ void TCPConnection::unclean_shutdown(){
     _sender.stream_in().set_error();
     _receiver.stream_out().set_error();
     _active = false;
+    
 }
