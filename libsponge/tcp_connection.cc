@@ -48,14 +48,13 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
             return ;
         }
     }
-    else if(seg.header().rst){
+    if(seg.header().rst){
         _sender.send_empty_segment();
         unclean_shutdown();
+        return ;
     }
-    else{
-        
-    }
-    clean_shutdown();
+    // SYN sent but not acked
+    // clean_shutdown();
  }
 
 bool TCPConnection::active() const {
@@ -76,12 +75,14 @@ void TCPConnection::tick(const size_t ms_since_last_tick) {
         unclean_shutdown();
     }
     send_sender_segments();
+    clean_shutdown();
 }
 
 void TCPConnection::end_input_stream() {
     _sender.stream_in().end_input();
     _sender.fill_window();
     send_sender_segments();
+    clean_shutdown();
 }
 
 void TCPConnection::connect() {
@@ -93,6 +94,7 @@ TCPConnection::~TCPConnection() {
     try {
         if (active()) {
             cerr << "Warning: Unclean shutdown of TCPConnection\n";
+            unclean_shutdown();
 
             // Your code here: need to send a RST segment to the peer
         }
@@ -107,12 +109,13 @@ void TCPConnection::send_sender_segments(){
     TCPSegment temp_segment;
     while(!que.empty()){
         temp_segment = que.front();
-        temp_segment.header().ackno = _receiver.ackno();
+        temp_segment.header().ackno = _receiver.ackno().value();
         int windowsize = _receiver.window_size();
         temp_segment.header().win = min(windowsize,UINT_LEAST16_MAX);
         _segments_out.push(temp_segment);
         que.pop();
     }
+    clean_shutdown();
 }
 
 
