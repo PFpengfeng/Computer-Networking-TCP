@@ -102,19 +102,10 @@ TCPConnection::~TCPConnection() {
 }
 
 
-bool TCPConnection::is_preq1() const{
-    return (_receiver.unassembled_bytes() == 0 && _receiver.stream_out().eof());
+void TCPConnection::send_sender_segments(){
+    if();
 }
 
-
-bool TCPConnection::is_preq2() const{
-    return _sender.fin_sent();
-}
-
-bool TCPConnection::is_preq3() const{
-    return (_sender.bytes_in_flight() == 0 && _sender.fin_sent());
-}
-
-// bool TCPConnection::is_preq4(){
-//     return _sender.fin_sent();
-// }
+    void send_sender_segments();
+    void clean_shutdown();
+    void unclean_shutdown();

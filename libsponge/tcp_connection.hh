@@ -21,12 +21,13 @@ class TCPConnection {
     //! in case the remote TCPConnection doesn't know we've received its whole stream?
     bool _linger_after_streams_finish{true};
 
-    size_t _timer{0};
-    bool _rst_received{false};
-    bool is_preq1() const;
-    bool is_preq2() const;
-    bool is_preq3() const;
-    // bool is_preq4() const;
+  private:
+    size_t _time_since_last_recieving{0};
+    bool _active{true};
+
+    void send_sender_segments();
+    void clean_shutdown();
+    void unclean_shutdown();
 
   public:
     //! \name "Input" interface for the writer
