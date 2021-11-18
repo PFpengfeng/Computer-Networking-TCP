@@ -32,6 +32,7 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
     if(!_active){
         return ;
     }
+    _time_since_last_recieving = 0;
     // not connected, not receiving SYN and don't have ackno
     if(!_receiver.ackno().has_value()){
         if(seg.header().syn){
@@ -39,11 +40,10 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
             _sender.fill_window(); 
             connect();
         }
-        else{
-            return ;
-        }
+        return ;
     }
     else{
+        
         
     }
     if (seg.header().rst){
@@ -87,7 +87,11 @@ size_t TCPConnection::write(const string &data) {
 
 //! \param[in] ms_since_last_tick number of milliseconds since the last call to this method
 void TCPConnection::tick(const size_t ms_since_last_tick) { 
-    _timer += ms_since_last_tick;
+    _time_since_last_recieving += ms_since_last_tick;
+    if(_sender.consecutive_retransmissions() >= _cfg.MAX_RETX_ATTEMPTS){
+        // unclean closing 
+        unclean_shutdown();
+    }
 }
 
 void TCPConnection::end_input_stream() {
@@ -96,6 +100,7 @@ void TCPConnection::end_input_stream() {
 
 void TCPConnection::connect() {
     _sender.fill_window();
+    send_sender_segments();
 }
 
 TCPConnection::~TCPConnection() {
@@ -112,9 +117,29 @@ TCPConnection::~TCPConnection() {
 
 
 void TCPConnection::send_sender_segments(){
-    if();
+    auto que = _sender.segments_out();
+    TCPSegment temp_segment;
+    while(!que.empty()){
+        temp_segment = que.front();
+        temp_segment.header().ackno = _receiver.ackno();
+        int windowsize = _receiver.window_size();
+        temp_segment.header().win = min(windowsize,UINT_LEAST16_MAX);
+        _segments_out.push(temp_segment);
+        que.pop();
+    }
 }
 
-    void send_sender_segments();
-    void clean_shutdown();
-    void unclean_shutdown();
+
+void TCPConnection::clean_shutdown(){
+    if(_sender.segments_out().empty() && _receiver.stream_out().eof()){
+        
+    }
+}
+
+
+void TCPConnection::unclean_shutdown(){
+    _sender.stream_in().set_error();
+    _receiver.stream_out().set_error();
+    _active = false;
+
+}
