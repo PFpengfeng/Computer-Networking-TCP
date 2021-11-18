@@ -25,10 +25,19 @@ size_t TCPConnection::unassembled_bytes() const {
  }
 
 size_t TCPConnection::time_since_last_segment_received() const {
-    return _timer; 
+    return _time_since_last_recieving; 
  }
 
 void TCPConnection::segment_received(const TCPSegment &seg) { 
+    if(!_active){
+        return ;
+    }
+    // not connected, not receiving SYN and don't have ackno
+    if(_receiver.ackno().has_value()){
+        if(seg.header().ack){
+            
+        }
+    }
     if (seg.header().rst){
         _sender.stream_in().set_error();
         _receiver.stream_out().set_error();
@@ -60,15 +69,7 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
  }
 
 bool TCPConnection::active() const {
-    if (_rst_received){
-        return false;
-    }
-    if(is_preq1() && is_preq3()){
-        return false;
-    }
-    else{
-        return true;
-    }
+    return _active;
  }
 
 size_t TCPConnection::write(const string &data) {
