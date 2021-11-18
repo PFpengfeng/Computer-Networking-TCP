@@ -33,10 +33,18 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
         return ;
     }
     // not connected, not receiving SYN and don't have ackno
-    if(_receiver.ackno().has_value()){
-        if(seg.header().ack){
-            
+    if(!_receiver.ackno().has_value()){
+        if(seg.header().syn){
+            _receiver.segment_received(seg);
+            _sender.fill_window(); 
+            connect();
         }
+        else{
+            return ;
+        }
+    }
+    else{
+        
     }
     if (seg.header().rst){
         _sender.stream_in().set_error();
