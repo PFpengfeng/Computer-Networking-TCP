@@ -70,10 +70,12 @@ size_t TCPConnection::write(const string &data) {
 //! \param[in] ms_since_last_tick number of milliseconds since the last call to this method
 void TCPConnection::tick(const size_t ms_since_last_tick) { 
     _time_since_last_recieving += ms_since_last_tick;
+    _sender.tick(ms_since_last_tick);
     if(_sender.consecutive_retransmissions() >= _cfg.MAX_RETX_ATTEMPTS){
         // unclean closing 
         unclean_shutdown();
     }
+    send_sender_segments();
 }
 
 void TCPConnection::end_input_stream() {
@@ -116,8 +118,15 @@ void TCPConnection::send_sender_segments(){
 
 void TCPConnection::clean_shutdown(){
     if(_sender.segments_out().empty() && _receiver.stream_out().eof()){
-        
+        _linger_after_streams_finish = false;
+        if(!_linger_after_streams_finish && _time_since_last_recieving > 10 * _cfg.rt_timeout){
+            _active = false;
+        }
+        if(_sender.fin_sent() and _sender.bytes_in_flight() == 0){
+            _active = false;
+        }
     }
+
 }
 
 
@@ -125,5 +134,12 @@ void TCPConnection::unclean_shutdown(){
     _sender.stream_in().set_error();
     _receiver.stream_out().set_error();
     _active = false;
-    
+    if(_sender.segments_out().empty()){
+        _sender.send_empty_segment();
+    }
+    TCPSegment temp_segment = _sender.segments_out().front();
+    temp_segment.header().ack = true;
+    temp_segment.header().ackno = _receiver.ackno().value();
+    temp_segment.header().rst = true;
+    _segments_out.push(temp_segment);
 }
