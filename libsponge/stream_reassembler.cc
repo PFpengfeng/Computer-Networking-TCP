@@ -37,7 +37,6 @@ int StreamReassembler::merge_package(Package &lift,const Package &right){
     }
     size_t loc = x.index + x.length - y.index;
     x.data = x.data + y.data.substr(loc);
-    cout<<"loc = "<<loc<<endl;
     x.length = x.data.size();
     lift = x;
     return loc;

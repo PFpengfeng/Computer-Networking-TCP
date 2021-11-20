@@ -33,26 +33,42 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
         return ;
     }
     _time_since_last_recieving = 0;
+
     // not connected, not receiving SYN and don't have ackno
     if(!_receiver.ackno().has_value()){
+        cout<<"is this happen!"<<endl;
         if(seg.header().syn){
-            _receiver.segment_received(seg);
-            _sender.fill_window(); 
-            connect();
-            return ;
-        }
-        else if(seg.length_in_sequence_space() == 0 && seg.header().seqno == _receiver.ackno().value() - 1){
+            if(_sender.bytes_in_flight() == 0){
+                _receiver.segment_received(seg);
+                connect();
+            }
+            else{
+                _receiver.segment_received(seg);
+                _sender.ack_received(seg.header().ackno,seg.header().win);
+                _sender.send_empty_segment();
+                send_sender_segments();
+            }
+         }
+        return ;
+    }
+    else{
+        if(seg.length_in_sequence_space() == 0 && seg.header().seqno == _receiver.ackno().value() - 1){
             _sender.send_empty_segment();
-        }
-        else{
+            send_sender_segments();
             return ;
         }
     }
     if(seg.header().rst){
+        // receive rst and sender have sent the syn
         if(_sender.next_seqno_absolute() > 0){
             _sender.send_empty_segment();
             unclean_shutdown();
         }
+        return ;
+    }
+
+    // syn sent but not acked 
+    if(seg.header().ack && seg.payload().size() != 0){
         return ;
     }
     _receiver.segment_received(seg);
@@ -92,6 +108,12 @@ void TCPConnection::end_input_stream() {
 
 void TCPConnection::connect() {
     _sender.fill_window();
+    if(_sender.segments_out().empty()){
+        cout<<"a error happend here!"<<endl;
+    }
+    else{
+        cout<<"no problem! can produce a seg with syn!"<<endl;
+    }
     send_sender_segments();
 }
 
@@ -110,15 +132,24 @@ TCPConnection::~TCPConnection() {
 
 
 void TCPConnection::send_sender_segments(){
-    auto que = _sender.segments_out();
     TCPSegment temp_segment;
-    while(!que.empty()){
-        temp_segment = que.front();
-        temp_segment.header().ackno = _receiver.ackno().value();
-        int windowsize = _receiver.window_size();
-        temp_segment.header().win = min(windowsize,UINT_LEAST16_MAX);
+    while(!_sender.segments_out().empty()){
+        temp_segment = _sender.segments_out().front();
+        if(_receiver.ackno().has_value()){
+            cout << "produce a ack !"<<endl;
+            if(_receiver.ackno().has_value()){
+                cout<<"have value !"<<endl;
+            }
+            else {
+                cout<<"don't have value!"<<endl;
+            }
+            temp_segment.header().ackno = _receiver.ackno().value();
+            int windowsize = _receiver.window_size();
+            temp_segment.header().win = min(windowsize,UINT_LEAST16_MAX);
+        }
         _segments_out.push(temp_segment);
-        que.pop();
+        cout<<"successful ! and why"<<endl;
+        _sender.segments_out().pop();
     }
     clean_shutdown();
 }
