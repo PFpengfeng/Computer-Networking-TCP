@@ -36,7 +36,6 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
 
     // not connected, not receiving SYN and don't have ackno
     if(!_receiver.ackno().has_value()){
-        cout<<"is this happen!"<<endl;
         if(seg.header().syn){
             if(_sender.bytes_in_flight() == 0){
                 _receiver.segment_received(seg);
@@ -68,11 +67,14 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
     }
 
     // syn sent but not acked 
-    if(seg.header().ack && seg.payload().size() != 0){
-        return ;
-    }
+    // if(seg.header().ack && seg.payload().size() != 0){
+    //     return ;
+    // }
     _receiver.segment_received(seg);
     _sender.ack_received(seg.header().ackno,seg.header().win);
+    if(_sender.segments_out().empty() && seg.payload().size() > 0){
+        _sender.send_empty_segment();
+    }
     send_sender_segments();
     // SYN sent but not acked
     // clean_shutdown();
@@ -84,6 +86,8 @@ bool TCPConnection::active() const {
 
 size_t TCPConnection::write(const string &data) {
     size_t length = _sender.stream_in().write(data);
+    _sender.fill_window();
+    send_sender_segments();
     return length;
 }
 
@@ -91,9 +95,10 @@ size_t TCPConnection::write(const string &data) {
 void TCPConnection::tick(const size_t ms_since_last_tick) { 
     _time_since_last_recieving += ms_since_last_tick;
     _sender.tick(ms_since_last_tick);
-    if(_sender.consecutive_retransmissions() >= _cfg.MAX_RETX_ATTEMPTS){
+    if(_sender.consecutive_retransmissions() > _cfg.MAX_RETX_ATTEMPTS && _active){
         // unclean closing 
         unclean_shutdown();
+        return;
     }
     send_sender_segments();
     clean_shutdown();
@@ -108,12 +113,6 @@ void TCPConnection::end_input_stream() {
 
 void TCPConnection::connect() {
     _sender.fill_window();
-    if(_sender.segments_out().empty()){
-        cout<<"a error happend here!"<<endl;
-    }
-    else{
-        cout<<"no problem! can produce a seg with syn!"<<endl;
-    }
     send_sender_segments();
 }
 
@@ -136,19 +135,12 @@ void TCPConnection::send_sender_segments(){
     while(!_sender.segments_out().empty()){
         temp_segment = _sender.segments_out().front();
         if(_receiver.ackno().has_value()){
-            cout << "produce a ack !"<<endl;
-            if(_receiver.ackno().has_value()){
-                cout<<"have value !"<<endl;
-            }
-            else {
-                cout<<"don't have value!"<<endl;
-            }
+            temp_segment.header().ack = true;
             temp_segment.header().ackno = _receiver.ackno().value();
             int windowsize = _receiver.window_size();
             temp_segment.header().win = min(windowsize,UINT_LEAST16_MAX);
         }
         _segments_out.push(temp_segment);
-        cout<<"successful ! and why"<<endl;
         _sender.segments_out().pop();
     }
     clean_shutdown();
