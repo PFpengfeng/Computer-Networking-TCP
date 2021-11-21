@@ -61,9 +61,11 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
         // receive rst and sender have sent the syn
         if(_sender.next_seqno_absolute() > 0){
             _sender.send_empty_segment();
-            unclean_shutdown();
+            send_sender_segments();
         }
-        return ;
+        else{
+            return ;
+        }
     }
 
     // syn sent but not acked 
@@ -76,6 +78,10 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
         _sender.send_empty_segment();
     }
     send_sender_segments();
+    if(seg.header().rst){
+        _sender.send_empty_segment();
+        unclean_shutdown();
+    }
     // SYN sent but not acked
     // clean_shutdown();
  }
