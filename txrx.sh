@@ -10,7 +10,7 @@ show_usage() {
     echo "  -c or -s    Select client or server mode                    (must specify)"
     echo "  -R, -S, -D  Receive test, Send test, or Duplex test         (must specify)"
     echo
-    echo "  -t <rtto>   Set rtto to <rtto> ms                           12"
+    echo "  -t <rtto>   Set rtto to <rtto> ms                            12"
     echo "  -d <size>   Set total transfer size to <size>               32"
     echo "  -w <size>   Set window size to <size>                       1452"
     echo
