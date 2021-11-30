@@ -40,14 +40,6 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
         if (seg.payload().size()){
             return;
         }
-        // if (!seg.header().ack) {
-        //     if (seg.header().syn) {
-        //         // simultaneous open
-        //         _receiver.segment_received(seg);
-        //         _sender.send_empty_segment();
-        //     }
-        //     return;
-        // }
         if (seg.header().rst) {
             _receiver.stream_out().set_error();
             _sender.stream_in().set_error();
