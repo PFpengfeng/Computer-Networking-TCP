@@ -33,7 +33,25 @@ void NetworkInterface::send_datagram(const InternetDatagram &dgram, const Addres
     // convert IP address of next hop to raw 32-bit representation (used in ARP header)
     const uint32_t next_hop_ip = next_hop.ipv4_numeric();
 
-    DUMMY_CODE(dgram, next_hop, next_hop_ip);
+
+    EthernetFrame frame;
+    frame.header().type = EthernetHeader::TYPE_IPv4;
+    frame.header().src = _ethernet_address;
+    frame.payload() = move(dgram.serialize());
+    if (_table.count(next_hop_ip) && _timer <= _table[next_hop_ip].ttl) {
+        frame.header().dst = _table[next_hop_ip].mac;
+        _frames_out.push(frame);
+    } else {
+        _pending_arg.push(next_hop_ip);
+        _retransmission_arp_frame();
+        _frames_waiting.push({frame, next_hop_ip});
+    }
+
+    
+    if (_ip_mac_table.count(next_hop_ip) && _ip_mac_table[next_hop_ip].ttl < _timer){
+        //find the corresponding ethernet address and sent ethernetframe
+
+    }
 }
 
 //! \param[in] frame the incoming Ethernet frame
@@ -43,4 +61,18 @@ optional<InternetDatagram> NetworkInterface::recv_frame(const EthernetFrame &fra
 }
 
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
-void NetworkInterface::tick(const size_t ms_since_last_tick) { DUMMY_CODE(ms_since_last_tick); }
+void NetworkInterface::tick(const size_t ms_since_last_tick) { 
+    _timer += ms_since_last_tick;
+    _retransmission_arp_frame();
+ }
+
+//! \param[in] addr1 one ethernet address
+//! \param[in] addr2 anthor ethernet address
+bool NetworkInterface::_ethernet_address_equal(EthernetAddress addr1,EthernetAddress addr2){
+    for (int i=0; i<6; i++){
+        if (addr1[i] != addr2[i]){
+            return false;
+        }
+    }
+    return true;
+}
