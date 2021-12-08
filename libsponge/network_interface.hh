@@ -46,9 +46,17 @@ class NetworkInterface {
       EthernetAddress mac;
       size_t ttl;
     };
+     struct waiting_frame{
+      EthernetFrame frame;
+      uint32_t ip;
+    };
   
     std::map<uint32_t, arp_item> _ip_mac_table{};
     size_t _timer=0; 
+    std::queue<uint32_t> _pending_arg{};
+    std::queue<waiting_frame> _frame_without_mac{};
+    bool _pending_flag=false;
+    size_t _pending_timer=0;
 
     //! \brief if two addresses are equal!
     bool _ethernet_address_equal(EthernetAddress addr1,EthernetAddress addr2);

@@ -32,33 +32,82 @@ NetworkInterface::NetworkInterface(const EthernetAddress &ethernet_address, cons
 void NetworkInterface::send_datagram(const InternetDatagram &dgram, const Address &next_hop) {
     // convert IP address of next hop to raw 32-bit representation (used in ARP header)
     const uint32_t next_hop_ip = next_hop.ipv4_numeric();
-
-
     EthernetFrame frame;
     frame.header().type = EthernetHeader::TYPE_IPv4;
     frame.header().src = _ethernet_address;
     frame.payload() = move(dgram.serialize());
-    if (_table.count(next_hop_ip) && _timer <= _table[next_hop_ip].ttl) {
-        frame.header().dst = _table[next_hop_ip].mac;
+    if (_ip_mac_table.count(next_hop_ip) && _timer <= _ip_mac_table[next_hop_ip].ttl){
+        frame.header().dst = _ip_mac_table[next_hop_ip].mac;
         _frames_out.push(frame);
-    } else {
+    }
+    else{
         _pending_arg.push(next_hop_ip);
         _retransmission_arp_frame();
-        _frames_waiting.push({frame, next_hop_ip});
-    }
-
-    
-    if (_ip_mac_table.count(next_hop_ip) && _ip_mac_table[next_hop_ip].ttl < _timer){
-        //find the corresponding ethernet address and sent ethernetframe
-
+        _frame_without_mac.push({frame,next_hop_ip});
     }
 }
 
 //! \param[in] frame the incoming Ethernet frame
 optional<InternetDatagram> NetworkInterface::recv_frame(const EthernetFrame &frame) {
-    DUMMY_CODE(frame);
-    return {};
+    if(!_ethernet_address_equal(frame.header().dst,ETHERNET_BROADCAST) && !_ethernet_address_equal(frame.header().dst,_ethernet_address)){
+        return nullopt;
+    }
+    if(frame.header().type == EthernetHeader::TYPE_IPv4){
+        InternetDatagram dgram;
+        if(dgram.parse(frame.payload()) == ParseResult::NoError){
+            return dgram;
+        }
+        else{
+            return nullopt;
+        }
+    }
+    if(frame.header().type == EthernetHeader::TYPE_ARP){
+        ARPMessage arp_msg;
+        if(arp_msg.parse(frame.payload()) == ParseResult::NoError){
+            uint32_t ip = arp_msg.sender_ip_address;
+            _ip_mac_table[ip].mac = arp_msg.sender_ethernet_address;
+            _ip_mac_table[ip].ttl = _timer + 30 * 1000;  // active mappings last 30 seconds
+        }
+        if(arp_msg.opcode == arp_msg.OPCODE_REQUEST && arp_msg.target_ip_address == _ip_address.ipv4_numeric()){
+            ARPMessage reply;
+            reply.opcode = reply.OPCODE_REPLY;
+            reply.sender_ethernet_address = _ethernet_address;
+            reply.sender_ip_address = _ip_address.ipv4_numeric();
+            reply.target_ip_address = arp_msg.sender_ip_address;
+            reply.target_ethernet_address = arp_msg.sender_ethernet_address;
+
+            EthernetFrame arp_frame;
+            arp_frame.header().type = EthernetHeader::TYPE_ARP;
+            arp_frame.header().src = _ethernet_address;
+            arp_frame.header().dst = arp_msg.sender_ethernet_address;
+            arp_frame.payload() = move(reply.serialize());
+            _frames_out.push(arp_frame);
+        }
+        while (!_pending_arg.empty()){
+            uint32_t t_ip=_pending_arg.front();
+            if(_ip_mac_table.count(t_ip) && _timer <= _ip_mac_table[t_ip].ttl){
+                _pending_arg.pop();
+                _pending_flag=false;
+            }
+            else {
+                break;
+            }
+        }
+        while (!_frame_without_mac.empty()) {
+            waiting_frame node = _frame_without_mac.front();
+            if (_ip_mac_table.count(node.ip) && _timer <= _ip_mac_table[node.ip].ttl) {
+                node.frame.header().dst = _ip_mac_table[node.ip].mac;
+                _frame_without_mac.pop();
+                _frames_out.push(move(node.frame));
+            } 
+            else {
+                break;
+            }
+        }
+    }
+    return nullopt;
 }
+
 
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
 void NetworkInterface::tick(const size_t ms_since_last_tick) { 
@@ -75,4 +124,30 @@ bool NetworkInterface::_ethernet_address_equal(EthernetAddress addr1,EthernetAdd
         }
     }
     return true;
+}
+
+
+void NetworkInterface::_retransmission_arp_frame(){
+    if(!_pending_arg.empty()){
+        if(!_pending_flag || (_pending_flag && _pending_timer + 5000 < _timer)){
+            _pending_timer = _timer;
+            _pending_flag = true;
+
+            uint32_t ip=_pending_arg.front();
+            ARPMessage msg;
+            msg.opcode = ARPMessage::OPCODE_REQUEST;
+            msg.sender_ethernet_address = _ethernet_address;
+            msg.sender_ip_address = _ip_address.ipv4_numeric();
+            msg.target_ethernet_address = {0, 0, 0, 0, 0, 0};
+            msg.target_ip_address = ip;
+
+            EthernetFrame arp_frame;
+            arp_frame.header().type = EthernetHeader::TYPE_ARP;
+            arp_frame.header().src = _ethernet_address;
+            arp_frame.header().dst = ETHERNET_BROADCAST;
+            arp_frame.payload() = move(msg.serialize());
+
+            _frames_out.push(arp_frame);
+        }
+    }
 }
