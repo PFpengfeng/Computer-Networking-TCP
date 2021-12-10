@@ -18,14 +18,22 @@ size_t TCPConnection::bytes_in_flight() const { return _sender.bytes_in_flight()
 
 size_t TCPConnection::unassembled_bytes() const { return _receiver.unassembled_bytes(); }
 
+<<<<<<< HEAD
 size_t TCPConnection::time_since_last_segment_received() const { return _time_since_last_recieving; }
+=======
+size_t TCPConnection::time_since_last_segment_received() const { return _time_since_last_segment_received; }
+>>>>>>> test
 
 bool TCPConnection::active() const { return _active; }
 
 void TCPConnection::segment_received(const TCPSegment &seg) {
     if (!_active)
         return;
+<<<<<<< HEAD
     _time_since_last_recieving = 0;
+=======
+    _time_since_last_segment_received = 0;
+>>>>>>> test
     // State: listening for new connection
     if (!_receiver.ackno().has_value() && _sender.next_seqno_absolute() == 0) {
         if (!seg.header().syn)
@@ -40,6 +48,7 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
         if (seg.payload().size()){
             return;
         }
+<<<<<<< HEAD
         if (!seg.header().ack) {
             if (seg.header().syn) {
                 // simultaneous open
@@ -48,6 +57,8 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
             }
             return;
         }
+=======
+>>>>>>> test
         if (seg.header().rst) {
             _receiver.stream_out().set_error();
             _sender.stream_in().set_error();
@@ -90,7 +101,11 @@ size_t TCPConnection::write(const string &data) {
 void TCPConnection::tick(const size_t ms_since_last_tick) {
     if (!_active)
         return;
+<<<<<<< HEAD
     _time_since_last_recieving += ms_since_last_tick;
+=======
+    _time_since_last_segment_received += ms_since_last_tick;
+>>>>>>> test
     _sender.tick(ms_since_last_tick);
     if (_sender.consecutive_retransmissions() > TCPConfig::MAX_RETX_ATTEMPTS)
         unclean_shutdown();
