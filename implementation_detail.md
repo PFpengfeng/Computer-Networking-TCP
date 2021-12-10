@@ -96,8 +96,8 @@ cond(no)->sub1(right)->op
 
 
 
-
-
+## summary 
+finish lab1-6
 
 
 
